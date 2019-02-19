@@ -81,13 +81,36 @@ void read_configuration(char* file){
 
 }
 
+/*  Function to create a char array that we will use to send the information.
+    Takes the information as parameter and returns a char array filled with it.*/
+char* create_package(char package_type, char* random, char* data){
+    char* result;
+
+    result = (char*) malloc(78);
+
+    result[0] = package_type;
+    for(i=0; i<7; i++){
+        result[i+1] = name[i];
+    }
+    for(i=0; i<13; i++){
+        result[i+8] = MAC[i];
+    }
+    for(i=0; i<7; i++){
+        result[i+21] = random[i];
+    }
+    for(i=0; i<50; i++){
+        result[i+28] = data[i];
+    }
+    return result;
+}
 
 int main(int argc, char const *argv[]) {
-    
-    char configuration_file[MAX_FILE_PATH_LENGTH];
 
-    /*  Definition of the configuration file path. */
     char configuration_file[MAX_FILE_PATH_LENGTH];
+    char random[7];
+    char data[50];
+    char* package;
+    /*  Definition of the configuration file path. */
     strcpy(configuration_file, "client.cfg");
     for(i=1; i<argc; i++){
         if(strcmp(argv[i], "-c") == 0){
@@ -101,6 +124,18 @@ int main(int argc, char const *argv[]) {
     }
     read_configuration(configuration_file);
 
-
+    for(i=0; i<7; i++){
+        random[i] = '0';
+    }
+    for(i=0; i<50; i++){
+        data[i] = '\0';
+    }
+    package = create_package(REGISTER_REQ, random, data);
+    for(i=0; i<78; i++){
+        if(package[i] != '\0'){
+            printf("%c", package[i]);
+        }else
+        printf("\'\\0\'");
+    }
     return 0;
 }
