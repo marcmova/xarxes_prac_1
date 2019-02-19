@@ -10,18 +10,25 @@
 #include <stdlib.h>
 
 #define MAX_PARAMETERS_LENGTH 100
+#define MAX_FILE_PATH_LENGTH 100
 
+/* Client information*/
 char name[MAX_PARAMETERS_LENGTH];
 char MAC[MAX_PARAMETERS_LENGTH];
 char server_ip[MAX_PARAMETERS_LENGTH];
 char server_udp_port[MAX_PARAMETERS_LENGTH];
 char server_tcp_port[MAX_PARAMETERS_LENGTH];
 
+/* Scoket information*/
+struct sockaddr_in	addr_server,addr_client;
+int sock_udp,sock_tcp;
+
 int i=0, j=0, k=0; /* auxiliar counters 1*/
 int x=0, y=0, z=0; /* auxiliar counters 2*/
 
+
+/*  Function to read the configuration from the given file and store it.*/
 void read_configuration(char* file){
-    /* function to read the configuration and store it.*/
     FILE *fp;
     int copy;
     char ch;
@@ -63,9 +70,9 @@ void read_configuration(char* file){
 int main(int argc, char const *argv[]) {
 
     /* Definition of the configuration file path. */
-    char configuration_file[256];
+    char configuration_file[MAX_FILE_PATH_LENGTH];
     strcpy(configuration_file, "client.cfg");
-    for(i=0; i<argc; i++){
+    for(i=1; i<argc; i++){
         if(strcmp(argv[i], "-c") == 0){
             if(argc > i+1){
                 strcpy(configuration_file, argv[i+1]);
