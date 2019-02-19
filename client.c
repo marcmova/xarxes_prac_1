@@ -83,6 +83,9 @@ void read_configuration(char* file){
 
 
 int main(int argc, char const *argv[]) {
+    
+    char configuration_file[MAX_FILE_PATH_LENGTH];
+
     /*  Definition of the configuration file path. */
     char configuration_file[MAX_FILE_PATH_LENGTH];
     strcpy(configuration_file, "client.cfg");
