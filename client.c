@@ -9,17 +9,32 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
+/*  Parameter constants*/
 #define MAX_PARAMETERS_LENGTH 100
 #define MAX_FILE_PATH_LENGTH 100
 
-/* Client information*/
+/*  Register package types*/
+#define REGISTER_REQ 0X00
+#define REGISTER_ACK 0X01
+#define REGISTER_NACK 0X02
+#define REGISTER_REJ 0X03
+#define ERROR 0X09
+
+/*  Register possible states*/
+#define DISCONNECTED 0
+#define WAIT_REG 1
+#define REGISTERED 2
+#define ALIVE 3
+
+/*  Client information*/
 char name[MAX_PARAMETERS_LENGTH];
 char MAC[MAX_PARAMETERS_LENGTH];
 char server_ip[MAX_PARAMETERS_LENGTH];
 char server_udp_port[MAX_PARAMETERS_LENGTH];
 char server_tcp_port[MAX_PARAMETERS_LENGTH];
+int state = DISCONNECTED;
 
-/* Scoket information*/
+/*  Scoket information*/
 struct sockaddr_in	addr_server,addr_client;
 int sock_udp,sock_tcp;
 
@@ -27,7 +42,7 @@ int i=0, j=0, k=0; /* auxiliar counters 1*/
 int x=0, y=0, z=0; /* auxiliar counters 2*/
 
 
-/*  Function to read the configuration from the given file and store it.*/
+/*  Function to read the configuration from the given file and store it*/
 void read_configuration(char* file){
     FILE *fp;
     int copy;
@@ -68,8 +83,7 @@ void read_configuration(char* file){
 
 
 int main(int argc, char const *argv[]) {
-
-    /* Definition of the configuration file path. */
+    /*  Definition of the configuration file path. */
     char configuration_file[MAX_FILE_PATH_LENGTH];
     strcpy(configuration_file, "client.cfg");
     for(i=1; i<argc; i++){
