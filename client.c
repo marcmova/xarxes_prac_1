@@ -33,6 +33,7 @@ char server_ip[MAX_PARAMETERS_LENGTH];
 char server_udp_port[MAX_PARAMETERS_LENGTH];
 char server_tcp_port[MAX_PARAMETERS_LENGTH];
 int state = DISCONNECTED;
+char *random_number;
 
 /*  Scoket information*/
 struct sockaddr_in	addr_server,addr_client;
@@ -43,7 +44,8 @@ int x=0, y=0, z=0; /* auxiliar counters 2*/
 
 
 /*  Function to read the configuration from the given file and store it*/
-void read_configuration(char* file){
+void read_configuration(char* file)
+{
     FILE *fp;
     int copy;
     char ch;
@@ -56,18 +58,22 @@ void read_configuration(char* file){
     }
     i=0;
     j=0;
-    while((ch = fgetc(fp)) != EOF){
-        if(ch == ' '){
+    while((ch = fgetc(fp)) != EOF)
+    {
+        if(ch == ' ')
+        {
             ch = fgetc(fp);
             copy = 1;
         }
-        if(ch == '\n'){
+        if(ch == '\n')
+        {
             result[i][j] = '\0';
             i++;
             j=0;
             copy = 0;
         }
-        if(copy == 1){
+        if(copy == 1)
+        {
             result[i][j] = ch;
             j++;
         }
@@ -83,59 +89,107 @@ void read_configuration(char* file){
 
 /*  Function to create a char array that we will use to send the information.
     Takes the information as parameter and returns a char array filled with it.*/
-char* create_package(char package_type, char* random, char* data){
+char* create_package(char package_type, char* random, char* data)
+{
     char* result;
 
     result = (char*) malloc(78);
 
     result[0] = package_type;
-    for(i=0; i<7; i++){
+    for(i=0; i<7; i++)
+    {
         result[i+1] = name[i];
     }
-    for(i=0; i<13; i++){
+    for(i=0; i<13; i++)
+    {
         result[i+8] = MAC[i];
     }
-    for(i=0; i<7; i++){
+    for(i=0; i<7; i++)
+    {
         result[i+21] = random[i];
     }
-    for(i=0; i<50; i++){
+    for(i=0; i<50; i++)
+    {
         result[i+28] = data[i];
     }
     return result;
 }
 
-int main(int argc, char const *argv[]) {
+/*  Function to send a message by udp, it receives the string package and return void*/
+void send_udp_message(char* package)
+{
+    if(sendto(sock_udp, package, 78, 0, (struct sockaddr*) &addr_server, sizeof(addr_server)) < 0){
+        printf("Error al sendto\n");
+    }
+}
+
+/*  Open the socket and bind it to send messages later*/
+void open_udp_socket()
+{
+
+	sock_udp = socket(AF_INET, SOCK_DGRAM, 0);
+	if(sock_udp < 0)
+	{
+		printf("No puc obrir socket!!!\n");
+		exit(-1);
+	}
+
+	memset(&addr_client, 0, sizeof (struct sockaddr_in));
+	addr_client.sin_family = AF_INET;
+	addr_client.sin_addr.s_addr = htonl(INADDR_ANY);
+	addr_client.sin_port = htons(0);
+
+	/* Fem el binding */
+	if(bind(sock_udp,(struct sockaddr *)&addr_client,sizeof(struct sockaddr_in))<0)
+	{
+		fprintf(stderr,"No puc fer el binding del socket!!!\n");
+								exit(-2);
+	}
+
+    memset(&addr_server, 0, sizeof(addr_server));
+
+    addr_server.sin_family = AF_INET;
+    addr_server.sin_port = htons(atoi(server_udp_port));
+    addr_server.sin_addr.s_addr = atoi(server_ip);
+}
+
+int main(int argc, char const *argv[])
+{
 
     char configuration_file[MAX_FILE_PATH_LENGTH];
-    char random[7];
     char data[50];
     char* package;
+
+
     /*  Definition of the configuration file path. */
     strcpy(configuration_file, "client.cfg");
     for(i=1; i<argc; i++){
-        if(strcmp(argv[i], "-c") == 0){
-            if(argc > i+1){
+        if(strcmp(argv[i], "-c") == 0)
+        {
+            if(argc > i+1)
+            {
                 strcpy(configuration_file, argv[i+1]);
 
-            }else{
-                printf("Error, after \"-c\" parameter must be the configuration file.\n");
+            }
+            else
+            {
+                printf("Error, after \"-c\" parametermust be the configuration file.\n");
             }
         }
     }
     read_configuration(configuration_file);
 
-    for(i=0; i<7; i++){
-        random[i] = '0';
-    }
-    for(i=0; i<50; i++){
+    /*  Create a package that will be sent for the register request*/
+    random_number = "000000";
+    for(i=0; i<50; i++)
+    {
         data[i] = '\0';
     }
-    package = create_package(REGISTER_REQ, random, data);
-    for(i=0; i<78; i++){
-        if(package[i] != '\0'){
-            printf("%c", package[i]);
-        }else
-        printf("\'\\0\'");
-    }
+    package = create_package(REGISTER_REQ, random_number, data);
+
+    /*  Send a message and returns the answer*/
+    open_udp_socket();
+    send_udp_message(package);
+    package = receive_udp_message(time);
     return 0;
 }
