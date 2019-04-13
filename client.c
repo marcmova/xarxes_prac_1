@@ -6,8 +6,9 @@
 #include <net/if.h>
 #include <sys/ioctl.h>
 #include <netinet/in.h>
-#include <stdbool.h>
 #include <stdlib.h>
+#include <unistd.h>
+#include <time.h>
 
 /*  Parameter constants*/
 #define MAX_PARAMETERS_LENGTH 100
@@ -26,7 +27,16 @@
 #define REGISTERED 2
 #define ALIVE 3
 
-/*  Client information*/
+/*  Loop controller variables*/
+int request_number = 0, packages_sent = 0;
+float t = 2.0;
+int n = 3, m = 4, p = 8, s = 5, q = 3;
+int break_loop = 0;
+
+/*  An auxiliar package to store the actual data*/
+char* package;
+
+/*  Client and server information*/
 char name[MAX_PARAMETERS_LENGTH];
 char MAC[MAX_PARAMETERS_LENGTH];
 char server_ip[MAX_PARAMETERS_LENGTH];
@@ -38,9 +48,12 @@ char *random_number;
 /*  Scoket information*/
 struct sockaddr_in	addr_server,addr_client;
 int sock_udp,sock_tcp;
+socklen_t laddr_server;
 
-int i=0, j=0, k=0; /* auxiliar counters 1*/
-int x=0, y=0, z=0; /* auxiliar counters 2*/
+int i = 0, j = 0, k = 0; /* auxiliar counters 1*/
+int x = 0, y = 0, z = 0; /* auxiliar counters 2*/
+
+/*  Initializing the variables needed*/
 
 
 /*  Function to read the configuration from the given file and store it*/
@@ -89,7 +102,7 @@ void read_configuration(char* file)
 
 /*  Function to create a char array that we will use to send the information.
     Takes the information as parameter and returns a char array filled with it.*/
-char* create_package(char package_type, char* random, char* data)
+char* create_package(char package_type, char* data)
 {
     char* result;
 
@@ -106,7 +119,7 @@ char* create_package(char package_type, char* random, char* data)
     }
     for(i=0; i<7; i++)
     {
-        result[i+21] = random[i];
+        result[i+21] = random_number[i];
     }
     for(i=0; i<50; i++)
     {
@@ -121,6 +134,19 @@ void send_udp_message(char* package)
     if(sendto(sock_udp, package, 78, 0, (struct sockaddr*) &addr_server, sizeof(addr_server)) < 0){
         printf("Error al sendto\n");
     }
+}
+
+/*  Function to receive a message by udp socket within determinated time*/
+void receive_udp_message(float waiting_time)
+{
+    struct timeval tv;
+
+    package = malloc(78);
+    tv.tv_sec = waiting_time;
+    tv.tv_usec = 0.0;
+    setsockopt(sock_udp, SOL_SOCKET, SO_RCVTIMEO,&tv,sizeof(tv));
+    recvfrom(sock_udp,package,78,0,(struct sockaddr *)&addr_server,&laddr_server);
+
 }
 
 /*  Open the socket and bind it to send messages later*/
@@ -140,10 +166,10 @@ void open_udp_socket()
 	addr_client.sin_port = htons(0);
 
 	/* Fem el binding */
-	if(bind(sock_udp,(struct sockaddr *)&addr_client,sizeof(struct sockaddr_in))<0)
+	if(bind(sock_udp, (struct sockaddr *)&addr_client, sizeof(struct sockaddr_in))<0)
 	{
-		fprintf(stderr,"No puc fer el binding del socket!!!\n");
-								exit(-2);
+        fprintf(stderr, "No puc fer el binding del socket!!!\n");
+	       exit(-2);
 	}
 
     memset(&addr_server, 0, sizeof(addr_server));
@@ -153,17 +179,77 @@ void open_udp_socket()
     addr_server.sin_addr.s_addr = atoi(server_ip);
 }
 
+/*  Function to do a register try*/
+void register_try()
+{
+    for(j = 0; j < 8 && (state == WAIT_REG || state == DISCONNECTED); j++)
+    {
+        if(j < 2){
+            printf("Paquet enviat numero %d\n", j);
+            send_udp_message(create_package(REGISTER_REQ,"0"));
+            if(state == DISCONNECTED){
+                state = WAIT_REG;
+            }
+            printf("time: %f, break loop: %d\n", t, break_loop);
+            time_t now;
+            /************************/
+            time_t rawtime;
+            struct tm * timeinfo;
+
+            time ( &rawtime );
+            timeinfo = localtime ( &rawtime );
+            printf ( "Current local time and date: %s", asctime (timeinfo) );
+
+            /**********************************/
+            receive_udp_message(t);
+            if(package[0] == 1){
+                state = REGISTERED;
+                break_loop = 1;
+            }
+        }else if(t*j < t*m){
+            printf("Paquet enviat numero %d\n", j);
+            send_udp_message(create_package(REGISTER_REQ,"0"));
+            printf("time: %f, break loop: %d\n", t*j, break_loop);
+            /************************/
+            time_t rawtime;
+            struct tm * timeinfo;
+
+            time ( &rawtime );
+            timeinfo = localtime ( &rawtime );
+            printf ( "Current local time and date: %s", asctime (timeinfo) );
+
+            /**********************************/
+            receive_udp_message(t*j);
+        }else{
+            printf("Paquet enviat numero %d\n", j);
+            send_udp_message(create_package(REGISTER_REQ,"0"));
+            printf("time: %f, break loop: %d\n", t*m, break_loop);
+            /************************/
+            time_t rawtime;
+            struct tm * timeinfo;
+
+            time ( &rawtime );
+            timeinfo = localtime ( &rawtime );
+            printf ( "Current local time and date: %s", asctime (timeinfo) );
+
+            /**********************************/
+            receive_udp_message(t*m);
+        }
+
+    }
+}
+
+
 int main(int argc, char const *argv[])
 {
 
     char configuration_file[MAX_FILE_PATH_LENGTH];
     char data[50];
-    char* package;
-
 
     /*  Definition of the configuration file path. */
     strcpy(configuration_file, "client.cfg");
-    for(i=1; i<argc; i++){
+    for(i=1; i<argc; i++)
+    {
         if(strcmp(argv[i], "-c") == 0)
         {
             if(argc > i+1)
@@ -185,11 +271,30 @@ int main(int argc, char const *argv[])
     {
         data[i] = '\0';
     }
-    package = create_package(REGISTER_REQ, random_number, data);
 
-    /*  Send a message and returns the answer*/
+    /*  Start the register loop, it will do three tries on the register before it close the client*/
     open_udp_socket();
-    send_udp_message(package);
-    package = receive_udp_message(time);
+    break_loop = 0;
+    for(request_number = 0; request_number < 3 && break_loop == 0; request_number++)
+    {
+        register_try();
+        if(break_loop == 0 && request_number < 3)
+        {
+            sleep(5);
+        }
+
+    }
+    if(break_loop == 0)
+    {
+        printf("Paquet enviat incorrectament\n");
+    }
+    else
+    {
+        for(i = 21; i < 27; i++)
+        {
+            printf("%c", package[i]);
+        }
+        printf("\n");
+    }
     return 0;
 }
