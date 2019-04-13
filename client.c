@@ -185,54 +185,21 @@ void register_try()
     for(j = 0; j < 8 && (state == WAIT_REG || state == DISCONNECTED); j++)
     {
         if(j < 2){
-            printf("Paquet enviat numero %d\n", j);
             send_udp_message(create_package(REGISTER_REQ,"0"));
             if(state == DISCONNECTED){
                 state = WAIT_REG;
             }
-            printf("time: %f, break loop: %d\n", t, break_loop);
             time_t now;
-            /************************/
-            time_t rawtime;
-            struct tm * timeinfo;
-
-            time ( &rawtime );
-            timeinfo = localtime ( &rawtime );
-            printf ( "Current local time and date: %s", asctime (timeinfo) );
-
-            /**********************************/
             receive_udp_message(t);
             if(package[0] == 1){
                 state = REGISTERED;
                 break_loop = 1;
             }
         }else if(t*j < t*m){
-            printf("Paquet enviat numero %d\n", j);
             send_udp_message(create_package(REGISTER_REQ,"0"));
-            printf("time: %f, break loop: %d\n", t*j, break_loop);
-            /************************/
-            time_t rawtime;
-            struct tm * timeinfo;
-
-            time ( &rawtime );
-            timeinfo = localtime ( &rawtime );
-            printf ( "Current local time and date: %s", asctime (timeinfo) );
-
-            /**********************************/
             receive_udp_message(t*j);
         }else{
-            printf("Paquet enviat numero %d\n", j);
             send_udp_message(create_package(REGISTER_REQ,"0"));
-            printf("time: %f, break loop: %d\n", t*m, break_loop);
-            /************************/
-            time_t rawtime;
-            struct tm * timeinfo;
-
-            time ( &rawtime );
-            timeinfo = localtime ( &rawtime );
-            printf ( "Current local time and date: %s", asctime (timeinfo) );
-
-            /**********************************/
             receive_udp_message(t*m);
         }
 
