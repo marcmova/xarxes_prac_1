@@ -178,6 +178,21 @@ void open_udp_socket()
     addr_server.sin_port = htons(atoi(server_udp_port));
     addr_server.sin_addr.s_addr = atoi(server_ip);
 }
+/*  Function to print the actual time at the beginning of the line*/
+void print_time()
+{
+    time_t timer;
+    char buffer[26];
+    struct tm* tm_info;
+
+    time(&timer);
+    tm_info = localtime(&timer);
+
+    strftime(buffer, 26, "%H:%M:%S", tm_info);
+    printf("%s: ", buffer);
+
+
+}
 
 /*  Function to do a register try*/
 void register_try()
@@ -186,13 +201,26 @@ void register_try()
     {
         if(j < 2){
             send_udp_message(create_package(REGISTER_REQ,"0"));
-            if(state == DISCONNECTED){
+            if(state == DISCONNECTED)
+            {
                 state = WAIT_REG;
             }
-            time_t now;
             receive_udp_message(t);
-            if(package[0] == 1){
+            if(package[0] == REGISTER_ACK)
+            {
+                print_time();
+                printf("Registered\n");
                 state = REGISTERED;
+                break_loop = 1;
+            }
+            else if(package[0] == REGISTER_NACK)
+            {
+                state = DISCONNECTED;
+                j=8;
+            }
+            else if(package[0] == REGISTER_REJ)
+            {
+                state = DISCONNECTED;
                 break_loop = 1;
             }
         }else if(t*j < t*m){
@@ -264,4 +292,5 @@ int main(int argc, char const *argv[])
         printf("\n");
     }
     return 0;
+
 }
