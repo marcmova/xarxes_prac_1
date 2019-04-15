@@ -55,6 +55,19 @@ int x = 0, y = 0, z = 0; /* auxiliar counters 2*/
 
 /*  Initializing the variables needed*/
 
+/*  Function to print the actual time at the beginning of the line*/
+void print_time()
+{
+    time_t timer;
+    char buffer[26];
+    struct tm* tm_info;
+
+    time(&timer);
+    tm_info = localtime(&timer);
+
+    strftime(buffer, 26, "%H:%M:%S", tm_info);
+    printf("%s: ", buffer);
+}
 
 /*  Function to read the configuration from the given file and store it*/
 void read_configuration(char* file)
@@ -131,6 +144,8 @@ char* create_package(char package_type, char* data)
 /*  Function to send a message by udp, it receives the string package and return void*/
 void send_udp_message(char* package)
 {
+    print_time();
+    printf("missatge enviat\n");
     if(sendto(sock_udp, package, 78, 0, (struct sockaddr*) &addr_server, sizeof(addr_server)) < 0){
         printf("Error al sendto\n");
     }
@@ -178,48 +193,44 @@ void open_udp_socket()
     addr_server.sin_port = htons(atoi(server_udp_port));
     addr_server.sin_addr.s_addr = atoi(server_ip);
 }
-/*  Function to print the actual time at the beginning of the line*/
-void print_time()
-{
-    time_t timer;
-    char buffer[26];
-    struct tm* tm_info;
-
-    time(&timer);
-    tm_info = localtime(&timer);
-
-    strftime(buffer, 26, "%H:%M:%S", tm_info);
-    printf("%s: ", buffer);
-
-
-}
 
 /*  Function to do a register try*/
 void register_try()
 {
-    for(j = 0; j < 8 && (state == WAIT_REG || state == DISCONNECTED); j++)
+    for(j = 0; j < 8 && (state == WAIT_REG || state == DISCONNECTED) && break_loop == 0; j++)
     {
         if(j < 2){
             send_udp_message(create_package(REGISTER_REQ,"0"));
             if(state == DISCONNECTED)
             {
                 state = WAIT_REG;
+                print_time();
+                printf("State changed from DISCONNECTED to WAIT_REG.\n");
             }
             receive_udp_message(t);
             if(package[0] == REGISTER_ACK)
             {
-                print_time();
-                printf("Registered\n");
                 state = REGISTERED;
+                print_time();
+                printf("State changed from WAIT_REG to REGISTERED.\n");
                 break_loop = 1;
             }
             else if(package[0] == REGISTER_NACK)
             {
                 state = DISCONNECTED;
+                print_time();
+                printf("State changed from WAIT_REG to DISCONNECTED.\n");
                 j=8;
             }
             else if(package[0] == REGISTER_REJ)
             {
+                print_time();
+                printf("Register failed: ");
+                for(k = 28; package[k] != 0; k++)
+                {
+                    printf("%c", package[k]);
+                }
+                printf("\n");
                 state = DISCONNECTED;
                 break_loop = 1;
             }
