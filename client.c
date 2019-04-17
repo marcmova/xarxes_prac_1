@@ -50,12 +50,15 @@ int break_loop = 0;
 #define u 3
 int count_packages_lost = u;
 
+/*  Debug variable*/
+int debug = 0;
+
 /*  An auxiliar package to store the actual data*/
 char* package;
 
 /*  Thread variables*/
 pthread_t ALIVE_send;
-pthread_t ALIVE_receive;
+int alive_rejected_package = 0;
 
 /*  Client and server information*/
 char name[MAX_PARAMETERS_LENGTH];
@@ -318,19 +321,18 @@ void register_try()
 void * send_alive()
 {
     struct timeval spec;
-    fd_set readfds, writefds;
-    FD_ZERO(&readfds);
+    fd_set readfds;
     FD_SET(sock_udp, &readfds);
 
 
     while(count_packages_lost != 0)
     {
         send_udp_message(create_package(ALIVE_INF, ""));
+        state = ALIVE;
         count_packages_lost = count_packages_lost - 1;
         spec.tv_sec = r;
         spec.tv_usec = 0.0;
         print_time();
-        printf("Hola\n");
         if(select(sock_udp+1, &readfds, NULL, NULL, &spec) > 0)
         {
 
@@ -338,21 +340,20 @@ void * send_alive()
             if(package[0] == ALIVE_ACK)
             {
                 count_packages_lost = u;
-                printf("ALIVE_ACK\n");
                 sleep(spec.tv_sec);
                 usleep(spec.tv_usec);
 
             }
             else if(package[0] == ALIVE_NACK)
             {
-                printf("ALIVE_NACK\n");
                 sleep(spec.tv_sec);
                 usleep(spec.tv_usec);
 
             }
             else if(package[0] == ALIVE_REJ)
             {
-                printf("ALIVE_REJ\n");
+                state = DISCONNECTED;
+                alive_rejected_package = 1;
                 return NULL;
             }
             else{
@@ -360,9 +361,9 @@ void * send_alive()
                 usleep(spec.tv_usec);
             }
         }
-        printf("ei q no se reb!\n");
 
     }
+    return NULL;
 
 }
 
@@ -373,19 +374,35 @@ int main(int argc, char const *argv[])
 
     /*  Definition of the configuration file path. */
     strcpy(configuration_file, "client.cfg");
-    for(i=1; i<argc; i++)
+    if(argc > 4)
+    {
+        printf("Parameter error, possible parameters:\n\t-c:\tAllows you to specify the file where configuration is stored, followed by the route of the configuration file.\n\t-d:\tActivates the debug mode.\n");
+        return 0;
+    }
+    for(i = 1; i < argc; i++)
     {
         if(strcmp(argv[i], "-c") == 0)
         {
-            if(argc > i+1)
+            if(argc > i + 1)
             {
-                strcpy(configuration_file, argv[i+1]);
+                i = i + 1;
+                strcpy(configuration_file, argv[i]);
 
             }
             else
             {
                 printf("Error, after \"-c\" parameter must be the configuration file.\n");
+                return 0;
             }
+        }
+        else if(strcmp(argv[i], "-d") == 0)
+        {
+            debug = 1;
+        }
+        else
+        {
+            printf("Parameter error, possible parameters:\n\t-c:\tAllows you to specify the file where configuration is stored, followed by the route of the configuration file.\n\t-d:\tActivates the debug mode.\n");
+            return 0;
         }
     }
     read_configuration(configuration_file);
@@ -395,7 +412,7 @@ int main(int argc, char const *argv[])
     {
         random_number[i] = '0';
     }
-    random_number[i+1] = '\0';
+    random_number[i] = '\0';
 
     /*  Start the register loop, it will do three tries on the register before it close the client*/
     open_udp_socket();
@@ -422,7 +439,45 @@ int main(int argc, char const *argv[])
         }
     }
     pthread_create(&ALIVE_send,NULL,send_alive,NULL);
-    sleep(100);
+    while(count_packages_lost != 0)
+    {
+        if(alive_rejected_package != 0)
+        {
+            alive_rejected_package = 0;
+            pthread_cancel(ALIVE_send);
+            count_packages_lost = 3;
+            break_loop = 0;
+            for(i = 0; i < 6; i++)
+            {
+                random_number[i] = '0';
+            }
+            random_number[i] = '\0';
+            for(request_number = 0; request_number < 3 && break_loop == 0; request_number++)
+            {
+                register_try();
+                if(break_loop == 0 && request_number < 2)
+                {
+                    sleep(5);
+                }
+            }
+            if(break_loop == 0)
+            {
+                print_time();
+                printf("Three register tries done, exiting the client.\n");
+                return 0;
+            }
+            else
+            {
+                for(i = 21; i < 27; i++)
+                {
+                    random_number[i-21] = package[i];
+                }
+            }
+            pthread_create(&ALIVE_send,NULL,send_alive,NULL);
+        }
+
+    }
+    pthread_cancel(ALIVE_send);
     return 0;
 
 }
