@@ -9,9 +9,11 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <time.h>
+#include <pthread.h>
+#include <unistd.h>
 
 /*  Parameter constants*/
-#define MAX_PARAMETERS_LENGTH 100
+#define MAX_PARAMETERS_LENGTH 200
 #define MAX_FILE_PATH_LENGTH 100
 
 /*  Register package types*/
@@ -21,6 +23,12 @@
 #define REGISTER_REJ 0X03
 #define ERROR 0X09
 
+/*  Alive package types*/
+#define ALIVE_INF 0X10
+#define ALIVE_ACK 0X11
+#define ALIVE_NACK 0X12
+#define ALIVE_REJ 0X13
+
 /*  Register possible states*/
 #define DISCONNECTED 0
 #define WAIT_REG 1
@@ -28,13 +36,26 @@
 #define ALIVE 3
 
 /*  Loop controller variables*/
+#define n 3
+#define m 4
+#define p 8
+#define s 5
+#define q 3
+#define t 2
 int request_number = 0, packages_sent = 0;
-float t = 2.0;
-int n = 3, m = 4, p = 8, s = 5, q = 3;
 int break_loop = 0;
+
+/*  Alive control variables*/
+#define r 3
+#define u 3
+int count_packages_lost = u;
 
 /*  An auxiliar package to store the actual data*/
 char* package;
+
+/*  Thread variables*/
+pthread_t ALIVE_send;
+pthread_t ALIVE_receive;
 
 /*  Client and server information*/
 char name[MAX_PARAMETERS_LENGTH];
@@ -43,7 +64,7 @@ char server_ip[MAX_PARAMETERS_LENGTH];
 char server_udp_port[MAX_PARAMETERS_LENGTH];
 char server_tcp_port[MAX_PARAMETERS_LENGTH];
 int state = DISCONNECTED;
-char *random_number;
+char random_number[7];
 
 /*  Scoket information*/
 struct sockaddr_in	addr_server,addr_client;
@@ -144,10 +165,8 @@ char* create_package(char package_type, char* data)
 /*  Function to send a message by udp, it receives the string package and return void*/
 void send_udp_message(char* package)
 {
-    print_time();
-    printf("missatge enviat\n");
     if(sendto(sock_udp, package, 78, 0, (struct sockaddr*) &addr_server, sizeof(addr_server)) < 0){
-        printf("Error al sendto\n");
+        printf("Sendto error\n");
     }
 }
 
@@ -207,7 +226,7 @@ void register_try()
                 print_time();
                 printf("State changed from DISCONNECTED to WAIT_REG.\n");
             }
-            receive_udp_message(t);
+            receive_udp_message((float)t);
             if(package[0] == REGISTER_ACK)
             {
                 state = REGISTERED;
@@ -236,21 +255,121 @@ void register_try()
             }
         }else if(t*j < t*m){
             send_udp_message(create_package(REGISTER_REQ,"0"));
-            receive_udp_message(t*j);
+            receive_udp_message((float)t*j);
+            if(package[0] == REGISTER_ACK)
+            {
+                state = REGISTERED;
+                print_time();
+                printf("State changed from WAIT_REG to REGISTERED.\n");
+                break_loop = 1;
+            }
+            else if(package[0] == REGISTER_NACK)
+            {
+                state = DISCONNECTED;
+                print_time();
+                printf("State changed from WAIT_REG to DISCONNECTED.\n");
+                j=8;
+            }
+            else if(package[0] == REGISTER_REJ)
+            {
+                print_time();
+                printf("Register failed: ");
+                for(k = 28; package[k] != 0; k++)
+                {
+                    printf("%c", package[k]);
+                }
+                printf("\n");
+                state = DISCONNECTED;
+                break_loop = 1;
+            }
         }else{
             send_udp_message(create_package(REGISTER_REQ,"0"));
-            receive_udp_message(t*m);
+            receive_udp_message((float)t*m);
+            if(package[0] == REGISTER_ACK)
+            {
+                state = REGISTERED;
+                print_time();
+                printf("State changed from WAIT_REG to REGISTERED.\n");
+                break_loop = 1;
+            }
+            else if(package[0] == REGISTER_NACK)
+            {
+                print_time();
+                printf("State changed from WAIT_REG to DISCONNECTED.\n");
+                j=8;
+            }
+            else if(package[0] == REGISTER_REJ)
+            {
+                print_time();
+                printf("Register failed: ");
+                for(k = 28; package[k] != 0; k++)
+                {
+                    printf("%c", package[k]);
+                }
+                printf("\n");
+                state = DISCONNECTED;
+                break_loop = 1;
+            }
         }
 
     }
 }
 
+void * send_alive()
+{
+    struct timeval spec;
+    fd_set readfds, writefds;
+    FD_ZERO(&readfds);
+    FD_SET(sock_udp, &readfds);
+
+
+    while(count_packages_lost != 0)
+    {
+        send_udp_message(create_package(ALIVE_INF, ""));
+        count_packages_lost = count_packages_lost - 1;
+        spec.tv_sec = r;
+        spec.tv_usec = 0.0;
+        print_time();
+        printf("Hola\n");
+        if(select(sock_udp+1, &readfds, NULL, NULL, &spec) > 0)
+        {
+
+            recvfrom(sock_udp,package,78,0,(struct sockaddr *)&addr_server,&laddr_server);
+            if(package[0] == ALIVE_ACK)
+            {
+                count_packages_lost = u;
+                printf("ALIVE_ACK\n");
+                sleep(spec.tv_sec);
+                usleep(spec.tv_usec);
+
+            }
+            else if(package[0] == ALIVE_NACK)
+            {
+                printf("ALIVE_NACK\n");
+                sleep(spec.tv_sec);
+                usleep(spec.tv_usec);
+
+            }
+            else if(package[0] == ALIVE_REJ)
+            {
+                printf("ALIVE_REJ\n");
+                return NULL;
+            }
+            else{
+                sleep(spec.tv_sec);
+                usleep(spec.tv_usec);
+            }
+        }
+        printf("ei q no se reb!\n");
+
+    }
+
+}
+
 
 int main(int argc, char const *argv[])
 {
-
     char configuration_file[MAX_FILE_PATH_LENGTH];
-    char data[50];
 
     /*  Definition of the configuration file path. */
     strcpy(configuration_file, "client.cfg");
@@ -265,18 +384,18 @@ int main(int argc, char const *argv[])
             }
             else
             {
-                printf("Error, after \"-c\" parametermust be the configuration file.\n");
+                printf("Error, after \"-c\" parameter must be the configuration file.\n");
             }
         }
     }
     read_configuration(configuration_file);
 
     /*  Create a package that will be sent for the register request*/
-    random_number = "000000";
-    for(i=0; i<50; i++)
+    for(i = 0; i < 6; i++)
     {
-        data[i] = '\0';
+        random_number[i] = '0';
     }
+    random_number[i+1] = '\0';
 
     /*  Start the register loop, it will do three tries on the register before it close the client*/
     open_udp_socket();
@@ -284,24 +403,26 @@ int main(int argc, char const *argv[])
     for(request_number = 0; request_number < 3 && break_loop == 0; request_number++)
     {
         register_try();
-        if(break_loop == 0 && request_number < 3)
+        if(break_loop == 0 && request_number < 2)
         {
             sleep(5);
         }
-
     }
     if(break_loop == 0)
     {
-        printf("Paquet enviat incorrectament\n");
+        print_time();
+        printf("Three register tries done, exiting the client.\n");
+        return 0;
     }
     else
     {
         for(i = 21; i < 27; i++)
         {
-            printf("%c", package[i]);
+            random_number[i-21] = package[i];
         }
-        printf("\n");
     }
+    pthread_create(&ALIVE_send,NULL,send_alive,NULL);
+    sleep(100);
     return 0;
 
 }
