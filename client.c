@@ -93,6 +93,15 @@ void print_time()
     printf("%s: ", buffer);
 }
 
+/*  Function to print a message if the debug mode is on*/
+void print_debug(char* message){
+    if(debug == 1)
+    {
+        print_time();
+        printf("%s", message);
+    }
+}
+
 /*  Function to read the configuration from the given file and store it*/
 void read_configuration(char* file)
 {
@@ -166,10 +175,24 @@ char* create_package(char package_type, char* data)
 }
 
 /*  Function to send a message by udp, it receives the string package and return void*/
-void send_udp_message(char* package)
+void send_udp_message(char* package_to_send)
 {
-    if(sendto(sock_udp, package, 78, 0, (struct sockaddr*) &addr_server, sizeof(addr_server)) < 0){
+    if(sendto(sock_udp, package_to_send, 78, 0, (struct sockaddr*) &addr_server, sizeof(addr_server)) < 0)
+    {
+        print_time();
         printf("Sendto error\n");
+    }
+    if(package_to_send[0] == REGISTER_REQ)
+    {
+        print_debug("Sent REGISTER_REQ pacakge\n");
+    }
+    else if(package_to_send[0] == ALIVE_INF)
+    {
+        print_debug("Sent ALIVE_INF pacakge\n");
+    }
+    else
+    {
+        print_debug("Sent bad type pacakge\n");
     }
 }
 
@@ -182,8 +205,45 @@ void receive_udp_message(float waiting_time)
     tv.tv_sec = waiting_time;
     tv.tv_usec = 0.0;
     setsockopt(sock_udp, SOL_SOCKET, SO_RCVTIMEO,&tv,sizeof(tv));
-    recvfrom(sock_udp,package,78,0,(struct sockaddr *)&addr_server,&laddr_server);
-
+    if(recvfrom(sock_udp,package,78,0,(struct sockaddr *)&addr_server,&laddr_server) < 0)
+    {
+        print_debug("No packages received within timeout\n");
+    }
+    else
+    {
+        if(package[0] == REGISTER_ACK)
+        {
+            print_debug("Received REGISTER_ACK pacakge\n");
+        }
+        else if(package[0] == REGISTER_NACK)
+        {
+            print_debug("Received REGISTER_NACK pacakge\n");
+        }
+        else if(package[0] == REGISTER_REJ)
+        {
+            print_debug("Received REGISTER_REJ pacakge\n");
+        }
+        else if(package[0] == ERROR)
+        {
+            print_debug("Received ERROR pacakge\n");
+        }
+        else if(package[0] == ALIVE_ACK)
+        {
+            print_debug("Received ALIVE_ACK pacakge\n");
+        }
+        else if(package[0] == ALIVE_NACK)
+        {
+            print_debug("Received ALIVE_NACK pacakge\n");
+        }
+        else if(package[0] == REGISTER_NACK)
+        {
+            print_debug("Received ALIVE_REJ pacakge\n");
+        }
+        else
+        {
+            print_debug("Received bad type pacakge\n");
+        }
+    }
 }
 
 /*  Open the socket and bind it to send messages later*/
@@ -332,34 +392,76 @@ void * send_alive()
         count_packages_lost = count_packages_lost - 1;
         spec.tv_sec = r;
         spec.tv_usec = 0.0;
-        print_time();
         if(select(sock_udp+1, &readfds, NULL, NULL, &spec) > 0)
         {
 
-            recvfrom(sock_udp,package,78,0,(struct sockaddr *)&addr_server,&laddr_server);
-            if(package[0] == ALIVE_ACK)
-            {
-                count_packages_lost = u;
+            if(recvfrom(sock_udp,package,78,0,(struct sockaddr *)&addr_server,&laddr_server) < 0){
+                print_debug("No packages received within timeout\n");
                 sleep(spec.tv_sec);
                 usleep(spec.tv_usec);
+            }
+            else
+            {
+                if(package[0] == REGISTER_ACK)
+                {
+                    print_debug("Received REGISTER_ACK pacakge\n");
+                }
+                else if(package[0] == REGISTER_NACK)
+                {
+                    print_debug("Received REGISTER_NACK pacakge\n");
+                }
+                else if(package[0] == REGISTER_REJ)
+                {
+                    print_debug("Received REGISTER_REJ pacakge\n");
+                }
+                else if(package[0] == ERROR)
+                {
+                    print_debug("Received ERROR pacakge\n");
+                }
+                else if(package[0] == ALIVE_ACK)
+                {
+                    print_debug("Received ALIVE_ACK pacakge\n");
+                }
+                else if(package[0] == ALIVE_NACK)
+                {
+                    print_debug("Received ALIVE_NACK pacakge\n");
+                }
+                else if(package[0] == REGISTER_NACK)
+                {
+                    print_debug("Received ALIVE_REJ pacakge\n");
+                }
+                else
+                {
+                    print_debug("Received bad type pacakge\n");
+                }
+                if(package[0] == ALIVE_ACK)
+                {
+                    count_packages_lost = u;
+                    sleep(spec.tv_sec);
+                    usleep(spec.tv_usec);
 
-            }
-            else if(package[0] == ALIVE_NACK)
-            {
-                sleep(spec.tv_sec);
-                usleep(spec.tv_usec);
+                }
+                else if(package[0] == ALIVE_NACK)
+                {
+                    sleep(spec.tv_sec);
+                    usleep(spec.tv_usec);
 
+                }
+                else if(package[0] == ALIVE_REJ)
+                {
+                    state = DISCONNECTED;
+                    alive_rejected_package = 1;
+                    return NULL;
+                }
+                else{
+                    sleep(spec.tv_sec);
+                    usleep(spec.tv_usec);
+                }
             }
-            else if(package[0] == ALIVE_REJ)
-            {
-                state = DISCONNECTED;
-                alive_rejected_package = 1;
-                return NULL;
-            }
-            else{
-                sleep(spec.tv_sec);
-                usleep(spec.tv_usec);
-            }
+        }
+        else
+        {
+            print_debug("No ALIVE_ACK packages received within timeout\n");
         }
 
     }
@@ -477,6 +579,7 @@ int main(int argc, char const *argv[])
         }
 
     }
+    print_debug("Three ALIVE_ACK packages lost, exiting the client\n");
     pthread_cancel(ALIVE_send);
     return 0;
 
