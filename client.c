@@ -15,6 +15,7 @@
 /*  Parameter constants*/
 #define MAX_PARAMETERS_LENGTH 200
 #define MAX_FILE_PATH_LENGTH 100
+#define MAX_COMMANDS_LENGTH 256
 
 /*  Register package types*/
 #define REGISTER_REQ 0X00
@@ -66,6 +67,8 @@ char MAC[MAX_PARAMETERS_LENGTH];
 char server_ip[MAX_PARAMETERS_LENGTH];
 char server_udp_port[MAX_PARAMETERS_LENGTH];
 char server_tcp_port[MAX_PARAMETERS_LENGTH];
+char server_name[MAX_PARAMETERS_LENGTH];
+char server_MAC[MAX_PARAMETERS_LENGTH];
 int state = DISCONNECTED;
 char random_number[7];
 
@@ -76,8 +79,6 @@ socklen_t laddr_server;
 
 int i = 0, j = 0, k = 0; /* auxiliar counters 1*/
 int x = 0, y = 0, z = 0; /* auxiliar counters 2*/
-
-/*  Initializing the variables needed*/
 
 /*  Function to print the actual time at the beginning of the line*/
 void print_time()
@@ -276,6 +277,35 @@ void open_udp_socket()
     addr_server.sin_addr.s_addr = atoi(server_ip);
 }
 
+/*  This function check the data of the pacakge to know if its from the same server as the register*/
+int check_package(char* package_to_check)
+{
+    for(i=0; i<7; i++)
+    {
+        if(package_to_check[i+1] != server_name[i])
+        {
+            print_debug("Bad server name data received\n");
+            return(-1);
+        }
+    }
+    for(i=0; i<13; i++)
+    {
+        if(package_to_check[i+8] != server_MAC[i])
+        {
+            print_debug("Bad server MAC data received\n");
+            return(-1);
+        }
+    }
+    for(i=0; i<7; i++)
+    {
+        if(package_to_check[i+21] != random_number[i])
+        {
+            print_debug("Bad server random number data received\n");
+            return(-1);
+        }
+    }
+    return(0);
+}
 /*  Function to do a register try*/
 void register_try()
 {
@@ -380,7 +410,8 @@ void register_try()
 
 void * send_alive()
 {
-    struct timeval spec;
+    struct timespec spec;
+    struct timeval timeout;
     fd_set readfds;
     FD_SET(sock_udp, &readfds);
 
@@ -390,72 +421,72 @@ void * send_alive()
         send_udp_message(create_package(ALIVE_INF, ""));
         state = ALIVE;
         count_packages_lost = count_packages_lost - 1;
-        spec.tv_sec = r;
-        spec.tv_usec = 0.0;
-        if(select(sock_udp+1, &readfds, NULL, NULL, &spec) > 0)
+        timeout.tv_sec = r;
+        timeout.tv_usec = 0.0;
+        if(select(sock_udp+1, &readfds, NULL, NULL, &timeout) > 0)
         {
-
+            spec.tv_sec = timeout.tv_sec;
+            spec.tv_nsec = timeout.tv_usec*1000;
             if(recvfrom(sock_udp,package,78,0,(struct sockaddr *)&addr_server,&laddr_server) < 0){
                 print_debug("No packages received within timeout\n");
-                sleep(spec.tv_sec);
-                usleep(spec.tv_usec);
+                nanosleep(&spec, NULL);
             }
             else
             {
-                if(package[0] == REGISTER_ACK)
+                if(check_package(package) == 0)
                 {
-                    print_debug("Received REGISTER_ACK pacakge\n");
-                }
-                else if(package[0] == REGISTER_NACK)
-                {
-                    print_debug("Received REGISTER_NACK pacakge\n");
-                }
-                else if(package[0] == REGISTER_REJ)
-                {
-                    print_debug("Received REGISTER_REJ pacakge\n");
-                }
-                else if(package[0] == ERROR)
-                {
-                    print_debug("Received ERROR pacakge\n");
-                }
-                else if(package[0] == ALIVE_ACK)
-                {
-                    print_debug("Received ALIVE_ACK pacakge\n");
-                }
-                else if(package[0] == ALIVE_NACK)
-                {
-                    print_debug("Received ALIVE_NACK pacakge\n");
-                }
-                else if(package[0] == REGISTER_NACK)
-                {
-                    print_debug("Received ALIVE_REJ pacakge\n");
-                }
-                else
-                {
-                    print_debug("Received bad type pacakge\n");
-                }
-                if(package[0] == ALIVE_ACK)
-                {
-                    count_packages_lost = u;
-                    sleep(spec.tv_sec);
-                    usleep(spec.tv_usec);
+                    if(package[0] == REGISTER_ACK)
+                    {
+                        print_debug("Received REGISTER_ACK pacakge\n");
+                    }
+                    else if(package[0] == REGISTER_NACK)
+                    {
+                        print_debug("Received REGISTER_NACK pacakge\n");
+                    }
+                    else if(package[0] == REGISTER_REJ)
+                    {
+                        print_debug("Received REGISTER_REJ pacakge\n");
+                    }
+                    else if(package[0] == ERROR)
+                    {
+                        print_debug("Received ERROR pacakge\n");
+                    }
+                    else if(package[0] == ALIVE_ACK)
+                    {
+                        print_debug("Received ALIVE_ACK pacakge\n");
+                    }
+                    else if(package[0] == ALIVE_NACK)
+                    {
+                        print_debug("Received ALIVE_NACK pacakge\n");
+                    }
+                    else if(package[0] == REGISTER_NACK)
+                    {
+                        print_debug("Received ALIVE_REJ pacakge\n");
+                    }
+                    else
+                    {
+                        print_debug("Received bad type pacakge\n");
+                    }
+                    if(package[0] == ALIVE_ACK)
+                    {
+                        count_packages_lost = u;
+                        nanosleep(&spec, NULL);
 
-                }
-                else if(package[0] == ALIVE_NACK)
-                {
-                    sleep(spec.tv_sec);
-                    usleep(spec.tv_usec);
+                    }
+                    else if(package[0] == ALIVE_NACK)
+                    {
+                        nanosleep(&spec, NULL);
 
-                }
-                else if(package[0] == ALIVE_REJ)
-                {
-                    state = DISCONNECTED;
-                    alive_rejected_package = 1;
-                    return NULL;
+                    }
+                    else if(package[0] == ALIVE_REJ)
+                    {
+                        state = DISCONNECTED;
+                        alive_rejected_package = 1;
+                        return NULL;
+                    }
                 }
                 else{
-                    sleep(spec.tv_sec);
-                    usleep(spec.tv_usec);
+                    nanosleep(&spec, NULL);
                 }
             }
         }
@@ -465,7 +496,7 @@ void * send_alive()
         }
 
     }
-    return NULL;
+    exit(0);
 
 }
 
@@ -473,6 +504,7 @@ void * send_alive()
 int main(int argc, char const *argv[])
 {
     char configuration_file[MAX_FILE_PATH_LENGTH];
+    char command[MAX_COMMANDS_LENGTH];
 
     /*  Definition of the configuration file path. */
     strcpy(configuration_file, "client.cfg");
@@ -507,6 +539,10 @@ int main(int argc, char const *argv[])
             return 0;
         }
     }
+    /*  Setting initial state to DISCONNECTED*/
+    state = DISCONNECTED;
+    print_debug("Initial state DISCONNECTED\n");
+    
     read_configuration(configuration_file);
 
     /*  Create a package that will be sent for the register request*/
@@ -527,6 +563,7 @@ int main(int argc, char const *argv[])
             sleep(5);
         }
     }
+    /*  If three regiser try done, exit the client, otherwise we get the data from the server*/
     if(break_loop == 0)
     {
         print_time();
@@ -535,13 +572,22 @@ int main(int argc, char const *argv[])
     }
     else
     {
-        for(i = 21; i < 27; i++)
+        for(i=0; i<7; i++)
         {
-            random_number[i-21] = package[i];
+            server_name[i] = package[i+1];
+        }
+        for(i=0; i<13; i++)
+        {
+            server_MAC[i] = package[i+8];
+        }
+        for(i=0; i<7; i++)
+        {
+            random_number[i] = package[i+21];
         }
     }
+    /*  Starting the alive phase with a thread and waiting for commands in the main thread*/
     pthread_create(&ALIVE_send,NULL,send_alive,NULL);
-    while(count_packages_lost != 0)
+    while(1)
     {
         if(alive_rejected_package != 0)
         {
@@ -577,7 +623,11 @@ int main(int argc, char const *argv[])
             }
             pthread_create(&ALIVE_send,NULL,send_alive,NULL);
         }
-
+        scanf("%s", command);
+        if(strcmp(command, "quit") == 0)
+        {
+            print_debug("exiting the client\n");
+        }
     }
     print_debug("Three ALIVE_ACK packages lost, exiting the client\n");
     pthread_cancel(ALIVE_send);
