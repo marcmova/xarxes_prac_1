@@ -218,11 +218,21 @@ void receive_udp_message(float waiting_time)
         }
         else if(package[0] == REGISTER_NACK)
         {
-            print_debug("Received REGISTER_NACK pacakge\n");
+            print_debug("Received REGISTER_NACK pacakge: ");
+            for(x=0; x<50; x++)
+            {
+                printf("%c", package[x+28]);
+            }
+            printf("\n");
         }
         else if(package[0] == REGISTER_REJ)
         {
-            print_debug("Received REGISTER_REJ pacakge\n");
+            print_debug("Received REGISTER_REJ pacakge: ");
+            for(x=0; x<50; x++)
+            {
+                printf("%c", package[x+28]);
+            }
+            printf("\n");
         }
         else if(package[0] == ERROR)
         {
@@ -234,11 +244,21 @@ void receive_udp_message(float waiting_time)
         }
         else if(package[0] == ALIVE_NACK)
         {
-            print_debug("Received ALIVE_NACK pacakge\n");
+            print_debug("Received ALIVE_NACK pacakge: ");
+            for(x=0; x<50; x++)
+            {
+                printf("%c", package[x+28]);
+            }
+            printf("\n");
         }
         else if(package[0] == REGISTER_NACK)
         {
-            print_debug("Received ALIVE_REJ pacakge\n");
+            print_debug("Received ALIVE_REJ pacakge: ");
+            for(x=0; x<50; x++)
+            {
+                printf("%c", package[x+28]);
+            }
+            printf("\n");
         }
         else
         {
@@ -433,19 +453,47 @@ void * send_alive()
             }
             else
             {
-                if(check_package(package) == 0)
+                if(package[0] == REGISTER_NACK)
+                {
+                    print_debug("Received REGISTER_NACK pacakge: ");
+                    for(x=0; x<50; x++)
+                    {
+                        printf("%c", package[x+28]);
+                    }
+                    printf("\n");
+                }
+                else if(package[0] == REGISTER_REJ)
+                {
+                    print_debug("Received REGISTER_REJ pacakge: ");
+                    for(x=0; x<50; x++)
+                    {
+                        printf("%c", package[x+28]);
+                    }
+                    printf("\n");
+                }
+                else if(package[0] == ALIVE_NACK)
+                {
+                    print_debug("Received ALIVE_NACK pacakge: ");
+                    for(x=0; x<50; x++)
+                    {
+                        printf("%c", package[x+28]);
+                    }
+                    printf("\n");
+                }
+                else if(package[0] == ALIVE_REJ)
+                {
+                    print_debug("Received ALIVE_REJ pacakge: ");
+                    for(x=0; x<50; x++)
+                    {
+                        printf("%c", package[x+28]);
+                    }
+                    printf("\n");
+                }
+                else if(check_package(package) == 0)
                 {
                     if(package[0] == REGISTER_ACK)
                     {
                         print_debug("Received REGISTER_ACK pacakge\n");
-                    }
-                    else if(package[0] == REGISTER_NACK)
-                    {
-                        print_debug("Received REGISTER_NACK pacakge\n");
-                    }
-                    else if(package[0] == REGISTER_REJ)
-                    {
-                        print_debug("Received REGISTER_REJ pacakge\n");
                     }
                     else if(package[0] == ERROR)
                     {
@@ -459,7 +507,7 @@ void * send_alive()
                     {
                         print_debug("Received ALIVE_NACK pacakge\n");
                     }
-                    else if(package[0] == REGISTER_NACK)
+                    else if(package[0] == ALIVE_REJ)
                     {
                         print_debug("Received ALIVE_REJ pacakge\n");
                     }
@@ -496,7 +544,6 @@ void * send_alive()
         }
 
     }
-    exit(0);
 
 }
 
@@ -542,7 +589,7 @@ int main(int argc, char const *argv[])
     /*  Setting initial state to DISCONNECTED*/
     state = DISCONNECTED;
     print_debug("Initial state DISCONNECTED\n");
-    
+
     read_configuration(configuration_file);
 
     /*  Create a package that will be sent for the register request*/
