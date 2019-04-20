@@ -618,6 +618,7 @@ int main(int argc, char const *argv[])
     {
         print_time();
         printf("Three register tries done, exiting the client.\n");
+        close(sock_udp);
         return 0;
     }
     else
@@ -680,12 +681,14 @@ int main(int argc, char const *argv[])
             {
                 print_debug("exiting the client\n");
                 pthread_cancel(ALIVE_send);
+                close(sock_udp);
                 return 0;
             }
         }
     }
     print_debug("Three ALIVE_ACK packages lost, exiting the client\n");
     pthread_cancel(ALIVE_send);
+    close(sock_udp);
     return 0;
 
 }
