@@ -11,6 +11,8 @@
 #include <time.h>
 #include <pthread.h>
 #include <unistd.h>
+#include <sys/select.h>
+#include <poll.h>
 
 /*  Parameter constants*/
 #define MAX_PARAMETERS_LENGTH 200
@@ -542,8 +544,8 @@ void * send_alive()
         {
             print_debug("No ALIVE_ACK packages received within timeout\n");
         }
-
     }
+    return(NULL);
 
 }
 
@@ -552,6 +554,7 @@ int main(int argc, char const *argv[])
 {
     char configuration_file[MAX_FILE_PATH_LENGTH];
     char command[MAX_COMMANDS_LENGTH];
+    struct pollfd command_poll = {STDIN_FILENO, POLLIN|POLLPRI};
 
     /*  Definition of the configuration file path. */
     strcpy(configuration_file, "client.cfg");
@@ -634,7 +637,7 @@ int main(int argc, char const *argv[])
     }
     /*  Starting the alive phase with a thread and waiting for commands in the main thread*/
     pthread_create(&ALIVE_send,NULL,send_alive,NULL);
-    while(1)
+    while(count_packages_lost != 0 && alive_rejected_package == 0)
     {
         if(alive_rejected_package != 0)
         {
@@ -670,10 +673,15 @@ int main(int argc, char const *argv[])
             }
             pthread_create(&ALIVE_send,NULL,send_alive,NULL);
         }
-        scanf("%s", command);
-        if(strcmp(command, "quit") == 0)
+        if(poll(&command_poll, 1, 10))
         {
-            print_debug("exiting the client\n");
+            scanf("%s", command);
+            if(strcmp(command, "quit") == 0)
+            {
+                print_debug("exiting the client\n");
+                pthread_cancel(ALIVE_send);
+                return 0;
+            }
         }
     }
     print_debug("Three ALIVE_ACK packages lost, exiting the client\n");
