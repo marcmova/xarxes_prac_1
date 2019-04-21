@@ -334,7 +334,7 @@ void register_try()
     for(j = 0; j < 8 && (state == WAIT_REG || state == DISCONNECTED) && break_loop == 0; j++)
     {
         if(j < 2){
-            send_udp_message(create_package(REGISTER_REQ,"0"));
+            send_udp_message(create_package(REGISTER_REQ,""));
             if(state == DISCONNECTED)
             {
                 state = WAIT_REG;
@@ -369,7 +369,7 @@ void register_try()
                 break_loop = 1;
             }
         }else if(t*j < t*m){
-            send_udp_message(create_package(REGISTER_REQ,"0"));
+            send_udp_message(create_package(REGISTER_REQ,""));
             receive_udp_message((float)t*j);
             if(package[0] == REGISTER_ACK)
             {
@@ -398,7 +398,7 @@ void register_try()
                 break_loop = 1;
             }
         }else{
-            send_udp_message(create_package(REGISTER_REQ,"0"));
+            send_udp_message(create_package(REGISTER_REQ,""));
             receive_udp_message((float)t*m);
             if(package[0] == REGISTER_ACK)
             {
