@@ -645,6 +645,7 @@ int main(int argc, char const *argv[])
             alive_rejected_package = 0;
             pthread_cancel(ALIVE_send);
             state = DISCONNECTED;
+            print_debug("State changed from ALIVE to DISCONNECTED\n")
             count_packages_lost = 3;
             break_loop = 0;
             for(i = 0; i < 6; i++)
