@@ -638,12 +638,13 @@ int main(int argc, char const *argv[])
     }
     /*  Starting the alive phase with a thread and waiting for commands in the main thread*/
     pthread_create(&ALIVE_send,NULL,send_alive,NULL);
-    while(count_packages_lost != 0 && alive_rejected_package == 0)
+    while(request_number < 3)
     {
-        if(alive_rejected_package != 0)
+        if(alive_rejected_package != 0 || count_packages_lost == 0)
         {
             alive_rejected_package = 0;
             pthread_cancel(ALIVE_send);
+            state = DISCONNECTED;
             count_packages_lost = 3;
             break_loop = 0;
             for(i = 0; i < 6; i++)
@@ -651,8 +652,9 @@ int main(int argc, char const *argv[])
                 random_number[i] = '0';
             }
             random_number[i] = '\0';
-            for(request_number = 0; request_number < 3 && break_loop == 0; request_number++)
+            for(i = 0; request_number < 3 && break_loop == 0; request_number++)
             {
+                printf("%d\n", request_number);
                 register_try();
                 if(break_loop == 0 && request_number < 2)
                 {
