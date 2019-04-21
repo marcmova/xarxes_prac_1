@@ -3,12 +3,14 @@
 
 import sys
 import os
+import datetime
 
 """     Initialized default values for the settings"""
 configuration_file = "server.cfg"
 debug = False
 authorized_machines_file = "equips.dat"
 machines_data = []
+clients_timeout = []
 
 """   Created a function to read parameters from the program arguments"""
 def read_parameters():
@@ -53,7 +55,6 @@ def set_parameters(file):
 
 """     Setted the variables to store the server information"""
 name, MAC, udp_port, tcp_port = set_parameters(configuration_file)
-print name, MAC, udp_port, tcp_port
 
 """     This function creates the data structure where the data of the clients will be stored, in order to query it later"""
 def initialize_machines_data(file):
@@ -74,3 +75,13 @@ def initialize_machines_data(file):
         machines_data[x].append("000000\0")
         machines_data[x].append("")
 initialize_machines_data(authorized_machines_file)
+
+"""     This function return the actual number of seconds of the day as an int, we will use it to know the timeouts of the clients"""
+def get_clock_seconds():
+    return int(str(datetime.datetime.now().time())[0:2])*3600 + int(str(datetime.datetime.now().time())[3:5])*60 + int(str(datetime.datetime.now().time())[6:8])
+
+"""     This function initialize the data structure used for clients timeout, being the first number an indicator of the seconds it has to wait before timeout, and the second, the time when the last alive was received"""
+def initialize_clients_timeout():
+    global clients_timeout
+    for x in range(len(machines_data)):
+        clients_timeout.append([0,0])
