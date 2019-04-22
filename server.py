@@ -31,6 +31,7 @@ machines_data = []
 clients_timeout = []
 IP = "127.0.0.1"
 quit_command = False
+lock_alives = threading.Lock()
 
 """   Created a function to read parameters from the program arguments"""
 def read_parameters():
@@ -78,7 +79,7 @@ name, MAC, udp_port, tcp_port = set_parameters(configuration_file)
 
 def print_debug(message_debug):
     if debug == True:
-        print str(datetime.datetime.now())[:8] + ": " + message_debug
+        print str(datetime.datetime.now().time())[:8] + ": " + message_debug
 
 """     This function creates the data structure where the data of the clients will be stored, in order to query it later"""
 def initialize_machines_data(file):
@@ -118,29 +119,34 @@ sock_udp.bind((IP, int(udp_port)))
 def read_commands():
     command = raw_input("")
     if command == "quit":
+        print_debug("Exiting the server")
         sock_udp.close()
         os._exit(0)
     elif command == "list":
+        print_debug("Showing the state of the authorized clients")
         print("STATE\t\tNAME\t\tMAC\t\tRANDOM_NUMBER\t\tIP\n")
         for client in machines_data:
-            print client[0] + "\t" + client[1] + "\t\t" + client[2] + "\t" + client[3] + "\t\t\t" + client[4] + "\n"
+            if client[0] == "ALIVE":
+                print client[0] + "\t\t" + client[1] + "\t\t" + client[2] + "\t" + client[3] + "\t\t\t" + client[4] + "\n"
+            else:
+                print client[0] + "\t" + client[1] + "\t\t" + client[2] + "\t" + client[3] + "\t\t\t" + client[4] + "\n"
     else:
         print_debug("Invalid command")
 
 """         Function that creates the main packages of the server, using package_type, random number and data provided"""
 def create_package(package_type, random_number, data):
 	if package_type == REGISTER_ACK:
-		package = struct.pack('B',package_type) + name + "\0" + MAC + "\0" + random_number + "\0" + str(tcp_port) + "\0" + struct.pack('78B',*([0]* 78))
+		package = struct.pack('B',package_type) + name + "\0" + MAC + "\0" + random_number + "\0" + data + "\0" + struct.pack('78B',*([0]* 78))
 	elif package_type == REGISTER_NACK:
-		package = struct.pack('B',package_type) + "\0\0\0\0\0\0\0" + "000000000000" + "\0" + "000000" + "\0" + "Incorrect random number" + "\0" + struct.pack('78B',*([0]* 78))
+		package = struct.pack('B',package_type) + "\0\0\0\0\0\0\0" + "000000000000" + "\0" + "000000" + "\0" + data + "\0" + struct.pack('78B',*([0]* 78))
 	elif package_type == REGISTER_REJ:
-		package = struct.pack('B',package_type) + "\0\0\0\0\0\0\0" + "000000000000" + "\0" + "000000" + "\0" + "Non-authorized client, bad MAC or name" + "\0" + struct.pack('78B',*([0]* 78))
+		package = struct.pack('B',package_type) + "\0\0\0\0\0\0\0" + "000000000000" + "\0" + "000000" + "\0" + data + "\0" + struct.pack('78B',*([0]* 78))
 	elif package_type == ALIVE_ACK:
-		package = struct.pack('B',package_type) + name + "\0" + MAC + "\0" + random_number  + "\0" + struct.pack('78B',*([0]* 78))
+		package = struct.pack('B',package_type) + name + "\0" + MAC + "\0" + random_number  + "\0" + data + "\0" + struct.pack('78B',*([0]* 78))
 	elif package_type == ALIVE_NACK:
-		package = struct.pack('B',package_type) + "\0\0\0\0\0\0\0" + "000000000000" + "\0" + "000000" + "\0" + "Incorrect random number, ip or incoherent state" + "\0" + struct.pack('78B',*([0]* 78))
+		package = struct.pack('B',package_type) + "\0\0\0\0\0\0\0" + "000000000000" + "\0" + "000000" + "\0" + data + "\0" + struct.pack('78B',*([0]* 78))
 	elif package_type == ALIVE_REJ:
-		package = struct.pack('B',package_type) + "\0\0\0\0\0\0\0" + "000000000000" + "\0" + "000000" + "\0" + "Non-authorized client, bad MAC or name" + "\0" + struct.pack('78B',*([0]* 78))
+		package = struct.pack('B',package_type) + "\0\0\0\0\0\0\0" + "000000000000" + "\0" + "000000" + "\0" + data + "\0" + struct.pack('78B',*([0]* 78))
 	return package
 """     Funtion to return a string of six digits corresponding to a random number"""
 def generate_random():
@@ -157,32 +163,95 @@ def process_package(package, addr):
                 if package[8:21] == machines_data[machine][2]:
                     if package[21:28] == machines_data[machine][3]:
                         if machines_data[machine][0] == "DISCONNECTED":
-                            machines_data[machine][0] == "REGISTERED"
+                            machines_data[machine][0] = "REGISTERED"
                             print("Client numero " + str(machine+1) + ": State changed from DISCONNECTED to REGISTERED")
                             random_number = generate_random()
                             sock_udp.sendto(create_package(REGISTER_ACK, random_number, str(tcp_port) + "\0"), addr)
-                            print_debug("Received REGISTER_REQ message correctly\n")
+                            print_debug("Received REGISTER_ACK message correctly\n")
+                            print_debug("REGISTER_ACK sent\n")
                             machines_data[machine][3] = random_number + "\0"
                             clients_timeout[machine][0] = get_clock_seconds()
                             if clients_timeout[machine][1] == 0:
                                 clients_timeout[machine][1] = 1
                             machines_data[machine][4] = addr[0]
+                            return
                         elif machines_data[machine][0] == "REGISTERED" or machines_data[machine][0] == "ALIVE":
-                            sock_udp.sendto(create_package(REGISTER_ACK, machines_data[3], str(tcp_port) + "\0"), addr)
-                            print_debug("Received REGISTER_REQ message correctly\n")
+                            sock_udp.sendto(create_package(REGISTER_ACK, machines_data[machine][3], str(tcp_port) + "\0"), addr)
+                            print_debug("Received REGISTER_ACK message correctly\n")
+                            print_debug("REGISTER_ACK sent\n")
+                            return
                         else:
                             print_debug("Received REGISTER_REQ out of sequence\n")
-                            sock_udp.sendto(create_package(REGISTER_NACK, "000000", "Error bad "), addr)
+                            print_debug("REGISTER_NACK sent\n")
+                            sock_udp.sendto(create_package(REGISTER_NACK, "000000", "Error, REGISTER_REQ out of sequence"), addr)
+                            return
                     else:
-                        sock_udp.sendto(create_package(REGISTER_NACK, "000000", ""), addr)
-                else:
-
-
-        sock_udp.sendto(create_package(REGISTER_REJ, "", "Non-authorized client, bad MAC or name"), addr)
-    elif struct.unpack('B',package[0])[0] == ALIVE_INF:
-        pass
-
-
+                        print_debug("Received REGISTER_REQ with bad random number\n")
+                        print_debug("REGISTER_NACK sent\n")
+                        sock_udp.sendto(create_package(REGISTER_NACK, "000000", "Error, bad random number"), addr)
+                        return
+        print_debug("Received REGISTER_REQ from non-authorized client, bad MAC adress or name")
+        print_debug("REGISTER_REJ sent")
+        sock_udp.sendto(create_package(REGISTER_REJ, "000000", "Error, non-authorized client: bad name or MAC address"), addr)
+        return
+    elif ord(package[0]) == ALIVE_INF:
+        for machine in range(len(machines_data)):
+            if package[1:8] == machines_data[machine][1]:
+                if package[8:21] == machines_data[machine][2]:
+                    if package[21:28] == machines_data[machine][3]:
+                        if machines_data[machine][0] == "ALIVE" or machines_data[machine][0] == "REGISTERED":
+                            if machines_data[machine][4] == addr[0]:
+                                if machines_data[machine][0] == "REGISTERED":
+                                    print "Client numero " + str(machine+1) + ": State changed from REGISTERED to ALIVE"
+                                    machines_data[machine][0] = "ALIVE"
+                                sock_udp.sendto(create_package(ALIVE_ACK, machines_data[machine][3], ""), addr)
+                                print_debug("Received ALIVE_INF message correctly")
+                                print_debug("ALIVE_ACK sent")
+                                clients_timeout[machine][0] = get_clock_seconds()
+                                if clients_timeout[machine][1] == 1:
+                                    clients_timeout[machine][1] = 2
+                                return
+                            else:
+                                print_debug("Received ALIVE_INF from bad ip")
+                                print_debug("ALIVE_NACK sent")
+                                sock_udp.sendto(create_package(ALIVE_NACK, machines_data[machine][3], "Error: bad ip"), addr)
+                                return
+                        else:
+                            print_debug("Received ALIVE_INF out of sequence")
+                            print_debug("ALIVE_NACK sent")
+                            sock_udp.sendto(create_package(ALIVE_NACK, machines_data[machine][3], "Error: package out of sequence"), addr)
+                            return
+                    else:
+                        print_debug("Received ALIVE_INF with bad random number")
+                        print_debug("ALIVE_NACK sent")
+                        sock_udp.sendto(create_package(ALIVE_NACK, machines_data[machine][3], "Error: bad random number"), addr)
+                        return
+        print_debug("Received ALIVE_INF from non-authorized client: bad name or MAC address")
+        print_debug("ALIVE_REJ sent")
+        sock_udp.sendto(create_package(ALIVE_REJ, machines_data[machine][3], "Error, non-authorized client: bad name or MAC address"), addr)
+        return
+def timeout_alives():
+    global clients_timeout
+    global machines_data
+    while True:
+        lock_alives.acquire(True)
+        for x in range(len(clients_timeout)):
+            if clients_timeout[x][1] == 1:
+                if get_clock_seconds() > clients_timeout[x][0] + 6:
+                    print_debug("Client " + machines_data[x][1] + " DISCONNECTED: not received the first alive in 6 seconds")
+                    clients_timeout[x][1] = 0
+                    machines_data[x][0] = "DISCONNECTED"
+                    machines_data[x][3] = "000000\0"
+                    machines_data[x][4] = ""
+            elif clients_timeout[x][1] == 2:
+                if get_clock_seconds() > clients_timeout[x][0] + 9:
+                    print_debug("Client " + machines_data[x][1] + " DISCONNECTED: not received alives in 9 seconds")
+                    clients_timeout[x][1] = 0
+                    machines_data[x][0] = "DISCONNECTED"
+                    machines_data[x][3] = "000000\0"
+                    machines_data[x][4] = ""
+        lock_alives.release()
+alives_timeout_thread = threading.Thread(target = timeout_alives).start()
 while True:
     readable, writable, exceptional = select.select([sock_udp, sys.stdin], [], [])
     for s in readable:

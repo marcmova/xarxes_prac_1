@@ -373,6 +373,7 @@ void register_try()
                 printf("\n");
                 state = DISCONNECTED;
                 break_loop = 1;
+                exit(0);
             }
         }else if(t*j < t*m){
             send_udp_message(create_package(REGISTER_REQ,""));
@@ -450,7 +451,7 @@ void * send_alive()
         state = ALIVE;
         timeout.tv_sec = r;
         timeout.tv_usec = 0.0;
-        if(select(sock_udp+1, &readfds, NULL, NULL, &timeout) > 0)
+        if(select(sock_udp+1, &readfds, NULL, NULL, &timeout) >= 0)
         {
             spec.tv_sec = timeout.tv_sec;
             spec.tv_nsec = timeout.tv_usec*1000;
@@ -481,6 +482,8 @@ void * send_alive()
                         printf("%c", package[x+28]);
                     }
                     printf("\n");
+                    nanosleep(&spec, NULL);
+                    count_packages_lost = count_packages_lost - 1;
                 }
                 else if(package[0] == ALIVE_NACK)
                 {
@@ -490,6 +493,8 @@ void * send_alive()
                         printf("%c", package[x+28]);
                     }
                     printf("\n");
+                    nanosleep(&spec, NULL);
+                    count_packages_lost = count_packages_lost - 1;
                 }
                 else if(package[0] == ALIVE_REJ)
                 {
@@ -499,6 +504,8 @@ void * send_alive()
                         printf("%c", package[x+28]);
                     }
                     printf("\n");
+                    nanosleep(&spec, NULL);
+                    count_packages_lost = count_packages_lost - 1;
                 }
                 else if(check_package(package) == 0)
                 {
@@ -521,6 +528,11 @@ void * send_alive()
                     if(package[0] == ALIVE_ACK)
                     {
                         count_packages_lost = u;
+                        if(state == REGISTERED)
+                        {
+                            state = ALIVE;
+                            print_debug("State changed from ALIVE to DISCONNECTED\n");
+                        }
                         nanosleep(&spec, NULL);
 
                     }
@@ -539,6 +551,7 @@ void * send_alive()
                     }
                 }
                 else{
+                    count_packages_lost = count_packages_lost - 1;
                     nanosleep(&spec, NULL);
                 }
             }
@@ -652,11 +665,7 @@ int main(int argc, char const *argv[])
             print_debug("State changed from ALIVE to DISCONNECTED\n");
             count_packages_lost = 3;
             break_loop = 0;
-            for(i = 0; i < 6; i++)
-            {
-                random_number[i] = '0';
-            }
-            random_number[i] = '\0';
+            printf("\n");
             if(request_number == 3){
                 print_time();
                 printf("Three register tries done, exiting the client.\n");
