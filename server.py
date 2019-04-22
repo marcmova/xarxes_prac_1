@@ -76,6 +76,10 @@ def set_parameters(file):
 """     Setted the variables to store the server information"""
 name, MAC, udp_port, tcp_port = set_parameters(configuration_file)
 
+def print_debug(message_debug):
+    if debug == True:
+        print str(datetime.datetime.now())[:8] + ": " + message_debug
+
 """     This function creates the data structure where the data of the clients will be stored, in order to query it later"""
 def initialize_machines_data(file):
     global machines_data
@@ -120,7 +124,8 @@ def read_commands():
         print("STATE\t\tNAME\t\tMAC\t\tRANDOM_NUMBER\t\tIP\n")
         for client in machines_data:
             print client[0] + "\t" + client[1] + "\t\t" + client[2] + "\t" + client[3] + "\t\t\t" + client[4] + "\n"
-
+    else:
+        print_debug("Invalid command")
 
 """         Function that creates the main packages of the server, using package_type, random number and data provided"""
 def create_package(package_type, random_number, data):
@@ -152,13 +157,26 @@ def process_package(package, addr):
                 if package[8:21] == machines_data[machine][2]:
                     if package[21:28] == machines_data[machine][3]:
                         if machines_data[machine][0] == "DISCONNECTED":
+                            machines_data[machine][0] == "REGISTERED"
+                            print("Client numero " + str(machine+1) + ": State changed from DISCONNECTED to REGISTERED")
                             random_number = generate_random()
                             sock_udp.sendto(create_package(REGISTER_ACK, random_number, str(tcp_port) + "\0"), addr)
+                            print_debug("Received REGISTER_REQ message correctly\n")
                             machines_data[machine][3] = random_number + "\0"
                             clients_timeout[machine][0] = get_clock_seconds()
                             if clients_timeout[machine][1] == 0:
                                 clients_timeout[machine][1] = 1
                             machines_data[machine][4] = addr[0]
+                        elif machines_data[machine][0] == "REGISTERED" or machines_data[machine][0] == "ALIVE":
+                            sock_udp.sendto(create_package(REGISTER_ACK, machines_data[3], str(tcp_port) + "\0"), addr)
+                            print_debug("Received REGISTER_REQ message correctly\n")
+                        else:
+                            print_debug("Received REGISTER_REQ out of sequence\n")
+                            sock_udp.sendto(create_package(REGISTER_NACK, "000000", "Error bad "), addr)
+                    else:
+                        sock_udp.sendto(create_package(REGISTER_NACK, "000000", ""), addr)
+                else:
+
 
         sock_udp.sendto(create_package(REGISTER_REJ, "", "Non-authorized client, bad MAC or name"), addr)
     elif struct.unpack('B',package[0])[0] == ALIVE_INF:

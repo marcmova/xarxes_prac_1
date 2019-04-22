@@ -13,6 +13,7 @@
 #include <unistd.h>
 #include <sys/select.h>
 #include <poll.h>
+#include <arpa/inet.h>
 
 /*  Parameter constants*/
 #define MAX_PARAMETERS_LENGTH 200
@@ -58,7 +59,7 @@ int debug = 0;
 
 /*  An auxiliar package to store the actual data*/
 char* package;
-
+char* ip_client = "127.0.0.1";
 /*  Thread variables*/
 pthread_t ALIVE_send;
 int alive_rejected_package = 0;
@@ -287,7 +288,7 @@ void open_udp_socket()
 
 	memset(&addr_client, 0, sizeof (struct sockaddr_in));
 	addr_client.sin_family = AF_INET;
-	addr_client.sin_addr.s_addr = htonl(INADDR_ANY);
+	addr_client.sin_addr.s_addr = inet_addr(ip_client);
 	addr_client.sin_port = htons(0);
 
 	/* Fem el binding */
@@ -661,9 +662,8 @@ int main(int argc, char const *argv[])
                 printf("Three register tries done, exiting the client.\n");
                 return 0;
             }
-            for(i = 0; request_number < 3 && break_loop == 0; request_number++)
+            for(request_number = 0; request_number < 3 && break_loop == 0; request_number++)
             {
-                printf("%d\n", request_number);
                 register_try();
                 if(break_loop == 0 && request_number < 2)
                 {
