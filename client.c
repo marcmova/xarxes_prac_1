@@ -112,6 +112,11 @@ void read_configuration(char* file)
     int copy;
     char ch;
     char result [4][MAX_PARAMETERS_LENGTH];
+    for(i=0; i<7; i++)
+    {
+        name[i] = \0;
+    }
+    for(i=0; i<13; i++)
     fp = fopen(file, "r");
     if (fp == NULL)
     {
