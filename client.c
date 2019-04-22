@@ -114,7 +114,7 @@ void read_configuration(char* file)
     char result [4][MAX_PARAMETERS_LENGTH];
     for(i=0; i<7; i++)
     {
-        name[i] = \0;
+        name[i] = '\0';
     }
     for(i=0; i<13; i++)
     fp = fopen(file, "r");
@@ -447,7 +447,6 @@ void * send_alive()
     {
         send_udp_message(create_package(ALIVE_INF, ""));
         state = ALIVE;
-        count_packages_lost = count_packages_lost - 1;
         timeout.tv_sec = r;
         timeout.tv_usec = 0.0;
         if(select(sock_udp+1, &readfds, NULL, NULL, &timeout) > 0)
@@ -456,6 +455,7 @@ void * send_alive()
             spec.tv_nsec = timeout.tv_usec*1000;
             if(recvfrom(sock_udp,package,78,0,(struct sockaddr *)&addr_server,&laddr_server) < 0){
                 print_debug("No packages received within timeout\n");
+                count_packages_lost = count_packages_lost - 1;
                 nanosleep(&spec, NULL);
             }
             else
@@ -468,6 +468,9 @@ void * send_alive()
                         printf("%c", package[x+28]);
                     }
                     printf("\n");
+                    nanosleep(&spec, NULL);
+                    count_packages_lost = count_packages_lost - 1;
+
                 }
                 else if(package[0] == REGISTER_REJ)
                 {
@@ -510,14 +513,6 @@ void * send_alive()
                     {
                         print_debug("Received ALIVE_ACK pacakge\n");
                     }
-                    else if(package[0] == ALIVE_NACK)
-                    {
-                        print_debug("Received ALIVE_NACK pacakge\n");
-                    }
-                    else if(package[0] == ALIVE_REJ)
-                    {
-                        print_debug("Received ALIVE_REJ pacakge\n");
-                    }
                     else
                     {
                         print_debug("Received bad type pacakge\n");
@@ -530,11 +525,13 @@ void * send_alive()
                     }
                     else if(package[0] == ALIVE_NACK)
                     {
+                        count_packages_lost = count_packages_lost - 1;
                         nanosleep(&spec, NULL);
 
                     }
                     else if(package[0] == ALIVE_REJ)
                     {
+                        count_packages_lost = count_packages_lost - 1;
                         state = DISCONNECTED;
                         alive_rejected_package = 1;
                         return NULL;
@@ -548,6 +545,7 @@ void * send_alive()
         else
         {
             print_debug("No ALIVE_ACK packages received within timeout\n");
+            count_packages_lost = count_packages_lost - 1;
         }
     }
     return(NULL);
@@ -643,14 +641,14 @@ int main(int argc, char const *argv[])
     }
     /*  Starting the alive phase with a thread and waiting for commands in the main thread*/
     pthread_create(&ALIVE_send,NULL,send_alive,NULL);
-    while(request_number < 3)
+    while(1)
     {
         if(alive_rejected_package != 0 || count_packages_lost == 0)
         {
             alive_rejected_package = 0;
             pthread_cancel(ALIVE_send);
             state = DISCONNECTED;
-            print_debug("State changed from ALIVE to DISCONNECTED\n")
+            print_debug("State changed from ALIVE to DISCONNECTED\n");
             count_packages_lost = 3;
             break_loop = 0;
             for(i = 0; i < 6; i++)
@@ -658,6 +656,11 @@ int main(int argc, char const *argv[])
                 random_number[i] = '0';
             }
             random_number[i] = '\0';
+            if(request_number == 3){
+                print_time();
+                printf("Three register tries done, exiting the client.\n");
+                return 0;
+            }
             for(i = 0; request_number < 3 && break_loop == 0; request_number++)
             {
                 printf("%d\n", request_number);
