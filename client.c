@@ -292,7 +292,7 @@ void open_udp_socket()
 	addr_client.sin_port = htons(0);
 
 	/* Fem el binding */
-	if(bind(sock_udp, (struct sockaddr *)&addr_client, sizeof(struct sockaddr_in))<0)
+	if(bind(sock_udp, (struct sockaddr *)&addr_client, sizeof(struct sockaddr_in)) < 0)
 	{
         fprintf(stderr, "No puc fer el binding del socket!!!\n");
 	       exit(-2);
@@ -448,7 +448,6 @@ void * send_alive()
     while(count_packages_lost != 0)
     {
         send_udp_message(create_package(ALIVE_INF, ""));
-        state = ALIVE;
         timeout.tv_sec = r;
         timeout.tv_usec = 0.0;
         if(select(sock_udp+1, &readfds, NULL, NULL, &timeout) >= 0)
@@ -531,7 +530,8 @@ void * send_alive()
                         if(state == REGISTERED)
                         {
                             state = ALIVE;
-                            print_debug("State changed from ALIVE to DISCONNECTED\n");
+                            print_time();
+                            printf("State changed from REGISTERED to ALIVE\n");
                         }
                         nanosleep(&spec, NULL);
 
@@ -608,7 +608,8 @@ int main(int argc, char const *argv[])
     }
     /*  Setting initial state to DISCONNECTED*/
     state = DISCONNECTED;
-    print_debug("Initial state DISCONNECTED\n");
+    print_time();
+    printf("Initial state DISCONNECTED\n");
 
     read_configuration(configuration_file);
 
@@ -662,7 +663,8 @@ int main(int argc, char const *argv[])
             alive_rejected_package = 0;
             pthread_cancel(ALIVE_send);
             state = DISCONNECTED;
-            print_debug("State changed from ALIVE to DISCONNECTED\n");
+            print_time();
+            printf("State changed from ALIVE to DISCONNECTED\n");
             count_packages_lost = 3;
             break_loop = 0;
             printf("\n");
